@@ -1,0 +1,75 @@
+{
+  "info": {
+    "name": "FoodPro API",
+    "description": "API collection for FoodPro - AI Product Description Generator",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "GET All Products",
+      "request": {
+        "method": "GET",
+        "url": "http://127.0.0.1:8000/api/products"
+      },
+      "response": [{"status": "200 OK", "body": "{\"status\":\"success\",\"data\":[{\"id\":\"1\",\"name\":\"Himalayan Wildflower Honey\"}]}"}]
+    },
+    {
+      "name": "GET Single Product",
+      "request": {
+        "method": "GET",
+        "url": "http://127.0.0.1:8000/api/products/1"
+      },
+      "response": [{"status": "200 OK", "body": "{\"status\":\"success\",\"data\":{\"id\":\"1\",\"name\":\"Himalayan Wildflower Honey\"}}"}]
+    },
+    {
+      "name": "POST Create Product",
+      "request": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/api/products",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\":\"Himalayan Salt\",\"ingredients\":\"Pure rock salt\",\"weight\":\"250g\",\"features\":\"Unrefined, mineral-rich\",\"tone\":\"Health-Focused\",\"description\":\"\"}"
+        }
+      },
+      "response": [{"status": "201 Created", "body": "{\"status\":\"success\",\"data\":{\"id\":\"new-id\",\"name\":\"Himalayan Salt\"}}"}]
+    },
+    {
+      "name": "PUT Update Product",
+      "request": {
+        "method": "PUT",
+        "url": "http://127.0.0.1:8000/api/products/1",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\":\"Himalayan Wildflower Honey Premium\",\"tone\":\"Premium\"}"
+        }
+      },
+      "response": [{"status": "200 OK", "body": "{\"status\":\"success\",\"data\":{\"id\":\"1\",\"name\":\"Himalayan Wildflower Honey Premium\"}}"}]
+    },
+    {
+      "name": "DELETE Product",
+      "request": {
+        "method": "DELETE",
+        "url": "http://127.0.0.1:8000/api/products/2"
+      },
+      "response": [{"status": "204 No Content", "body": ""}]
+    },
+    {
+      "name": "GET Search Products",
+      "request": {
+        "method": "GET",
+        "url": "http://127.0.0.1:8000/api/products/search/query?q=honey"
+      },
+      "response": [{"status": "200 OK", "body": "{\"status\":\"success\",\"data\":[{\"id\":\"1\",\"name\":\"Himalayan Wildflower Honey\"}]}"}]
+    },
+    {
+      "name": "GET All Tones",
+      "request": {
+        "method": "GET",
+        "url": "http://127.0.0.1:8000/api/tones"
+      },
+      "response": [{"status": "200 OK", "body": "{\"status\":\"success\",\"data\":[\"Premium\",\"Traditional\",\"Health-Focused\"]}"}]
+    }
+  ]
+}
