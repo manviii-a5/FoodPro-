@@ -1,0 +1,246 @@
+import Navbar from '../components/Navbar'
+import Footer from '../components/Footer'
+import { useState, useEffect } from 'react'
+import Loader from '../components/ui/Loader'
+import Toast from '../components/ui/Toast'
+
+function Dashboard({ darkMode, setDarkMode }) {
+  const [products, setProducts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [toastVisible, setToastVisible] = useState(false)
+  const [toastMessage, setToastMessage] = useState('')
+  const [toastType, setToastType] = useState('success')
+  const [selectedTone, setSelectedTone] = useState('Premium')
+  const [form, setForm] = useState({
+    name: '', ingredients: '', weight: '', features: ''
+  })
+  const [editingId, setEditingId] = useState(null)
+  
+
+  useEffect(() => {
+    fetch('http://127.0.0.1:8000/api/products')
+      .then(res => res.json())
+      .then(data => {
+        setProducts(data.data)
+        setLoading(false)
+      })
+      .catch(() => {
+        setToastMessage('Failed to load products from backend')
+        setToastType('error')
+        setToastVisible(true)
+        setLoading(false)
+      })
+  }, [])
+
+ const handleGenerate = () => {
+    setLoading(true)
+    const isEditing = editingId !== null
+    const url = isEditing
+      ? `http://127.0.0.1:8000/api/products/${editingId}`
+      : 'http://127.0.0.1:8000/api/products'
+    const method = isEditing ? 'PUT' : 'POST'
+
+    fetch(url, {
+      method: method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...form, tone: selectedTone, description: '' })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (isEditing) {
+          setProducts(prev => prev.map(p => p.id === editingId ? data.data : p))
+          setToastMessage('Product updated successfully!')
+        } else {
+          setProducts(prev => [...prev, data.data])
+          setToastMessage('Product created successfully!')
+        }
+        setToastType('success')
+        setToastVisible(true)
+        setLoading(false)
+        setForm({ name: '', ingredients: '', weight: '', features: '' })
+        setEditingId(null)
+      })
+      .catch(() => {
+        setToastMessage(isEditing ? 'Failed to update product' : 'Failed to create product')
+        setToastType('error')
+        setToastVisible(true)
+        setLoading(false)
+      })
+  }
+
+  const handleEdit = (product) => {
+    setForm({
+      name: product.name,
+      ingredients: product.ingredients,
+      weight: product.weight,
+      features: product.features
+    })
+    setSelectedTone(product.tone)
+    setEditingId(product.id)
+  }
+
+  const handleDelete = (id) => {
+    if (!window.confirm('Delete this product?')) return
+    fetch(`http://127.0.0.1:8000/api/products/${id}`, { method: 'DELETE' })
+      .then(() => {
+        setProducts(prev => prev.filter(p => p.id !== id))
+        setToastMessage('Product deleted successfully!')
+        setToastType('success')
+        setToastVisible(true)
+      })
+      .catch(() => {
+        setToastMessage('Failed to delete product')
+        setToastType('error')
+        setToastVisible(true)
+      })
+  }
+
+  return (
+    <div className={darkMode ? 'bg-gray-950 min-h-screen' : 'bg-gray-50 min-h-screen'}>
+      <Navbar darkMode={darkMode} setDarkMode={setDarkMode} />
+
+      <section className="px-5 py-12">
+        <div className="max-w-4xl mx-auto">
+          <div className="mb-8">
+            <h1 className={`font-bold text-3xl ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              Generate Description
+            </h1>
+            <p className={`mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              Fill in your product details and let AI do the writing.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Input Panel */}
+            <div className={`rounded-2xl border shadow-sm p-6 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+              <h2 className={`font-semibold mb-5 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Product Details</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Product Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Himalayan Wildflower Honey"
+                    value={form.name}
+                    onChange={e => setForm({...form, name: e.target.value})}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Key Ingredients</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Pure wild honey"
+                    value={form.ingredients}
+                    onChange={e => setForm({...form, ingredients: e.target.value})}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Weight / Size</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 500g"
+                    value={form.weight}
+                    onChange={e => setForm({...form, weight: e.target.value})}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Key Features</label>
+                  <textarea
+                    placeholder="e.g. Raw, unprocessed, forest-sourced"
+                    rows="3"
+                    value={form.features}
+                    onChange={e => setForm({...form, features: e.target.value})}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 resize-none"
+                  ></textarea>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Tone</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {['Premium', 'Traditional', 'Health-Focused'].map(tone => (
+                      <button
+                        key={tone}
+                        onClick={() => setSelectedTone(tone)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium border-2 transition ${
+                          selectedTone === tone
+                            ? 'border-green-500 bg-green-50 text-green-700'
+                            : 'border-gray-200 text-gray-600'
+                        }`}
+                      >
+                        {tone}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleGenerate}
+                  className="bg-green-600 text-white w-full font-semibold py-3.5 rounded-xl text-base hover:bg-green-700 transition mt-2"
+                >
+                  {editingId ? 'Update Product' : 'Save Product'}
+                </button>
+              </div>
+            </div>
+
+            {/* Products from Backend */}
+            <div className={`rounded-2xl border shadow-sm p-6 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+              <h2 className={`font-semibold mb-5 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                Products from Backend
+              </h2>
+              {loading ? (
+                <div className="flex justify-center py-10">
+                  <Loader size="md" text="Loading from API..." />
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {products.map(product => (
+                    <div key={product.id} className={`p-4 rounded-xl border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-100'}`}>
+                      <div className="flex justify-between items-start">
+                        <h3 className={`font-semibold text-sm ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                          {product.name}
+                        </h3>
+                        <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">
+                          {product.tone}
+                        </span>
+                      </div>
+                      <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {product.weight} • {product.ingredients}
+                      </p>
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={() => handleEdit(product)}
+                          className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-100 transition"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(product.id)}
+                          className="text-xs font-medium px-3 py-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 transition"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <Toast
+        message={toastMessage}
+        type={toastType}
+        isVisible={toastVisible}
+        onClose={() => setToastVisible(false)}
+      />
+
+      <Footer />
+    </div>
+  )
+}
+
+export default Dashboard
