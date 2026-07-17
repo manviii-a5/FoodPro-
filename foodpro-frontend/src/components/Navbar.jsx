@@ -11,6 +11,7 @@ function Navbar({ darkMode, setDarkMode }) {
     { name: 'Dashboard', path: '/dashboard' },
     { name: 'Components', path: '/components' },
     { name: 'Login', path: '/login' },
+    { name: 'Register', path: '/register' },
   ]
 
   return (

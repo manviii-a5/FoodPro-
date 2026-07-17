@@ -1,16 +1,27 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import Optional
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
 from dotenv import load_dotenv
+from passlib.context import CryptContext
+from jose import jwt
+from datetime import datetime, timedelta
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import certifi
 import os
 
 load_dotenv()
 
 app = FastAPI(title="FoodPro API", version="2.0.0")
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,6 +35,40 @@ MONGO_URI = os.getenv("MONGO_URI")
 client = AsyncIOMotorClient(MONGO_URI, tlsCAFile=certifi.where(), serverSelectionTimeoutMS=5000)
 db = client.foodpro
 products_collection = db.products
+users_collection = db.users
+
+# --- Password hashing ---
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+# --- JWT config ---
+JWT_SECRET = os.getenv("JWT_SECRET")
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRE_DAYS = 7
+
+def create_access_token(user_id: str, email: str) -> str:
+    expire = datetime.utcnow() + timedelta(days=JWT_EXPIRE_DAYS)
+    payload = {"sub": user_id, "email": email, "exp": expire}
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+security = HTTPBearer()
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get("sub")
+        email = payload.get("email")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return {"user_id": user_id, "email": email}
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 def product_helper(product) -> dict:
     return {
@@ -51,6 +96,14 @@ class UpdateProduct(BaseModel):
     features: Optional[str] = None
     tone: Optional[str] = None
     description: Optional[str] = None
+
+class UserRegister(BaseModel):
+    email: str
+    password: str
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
 
 @app.on_event("startup")
 async def startup_event():
@@ -83,6 +136,32 @@ async def startup_event():
 async def root():
     return {"message": "FoodPro API is running!", "version": "2.0.0", "database": "MongoDB Atlas"}
 
+# --- Auth routes ---
+@app.post("/api/auth/register")
+@limiter.limit("5/minute")
+async def register(request: Request, user: UserRegister):
+    existing = await users_collection.find_one({"email": user.email})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    hashed = hash_password(user.password)
+    result = await users_collection.insert_one({"email": user.email, "password": hashed})
+    token = create_access_token(str(result.inserted_id), user.email)
+    return {"status": "success", "data": {"token": token, "email": user.email}}
+
+@app.post("/api/auth/login")
+@limiter.limit("5/minute")
+async def login(request: Request, user: UserLogin):
+    existing = await users_collection.find_one({"email": user.email})
+    if not existing or not verify_password(user.password, existing["password"]):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    token = create_access_token(str(existing["_id"]), user.email)
+    return {"status": "success", "data": {"token": token, "email": user.email}}
+
+@app.get("/api/auth/me")
+async def get_me(current_user: dict = Depends(get_current_user)):
+    return {"status": "success", "data": current_user}
+
+# --- Product routes ---
 @app.get("/api/products")
 async def get_products():
     products = []
@@ -113,14 +192,14 @@ async def get_product(product_id: str):
     return {"status": "success", "data": product_helper(product)}
 
 @app.post("/api/products", status_code=201)
-async def create_product(product: Product):
+async def create_product(product: Product, current_user: dict = Depends(get_current_user)):
     new_product = product.dict()
     result = await products_collection.insert_one(new_product)
     created = await products_collection.find_one({"_id": result.inserted_id})
     return {"status": "success", "data": product_helper(created)}
 
 @app.put("/api/products/{product_id}")
-async def update_product(product_id: str, updated: UpdateProduct):
+async def update_product(product_id: str, updated: UpdateProduct, current_user: dict = Depends(get_current_user)):
     try:
         update_data = {k: v for k, v in updated.dict().items() if v is not None}
         result = await products_collection.update_one(
@@ -135,7 +214,7 @@ async def update_product(product_id: str, updated: UpdateProduct):
     return {"status": "success", "data": product_helper(product)}
 
 @app.delete("/api/products/{product_id}", status_code=204)
-async def delete_product(product_id: str):
+async def delete_product(product_id: str, current_user: dict = Depends(get_current_user)):
     try:
         result = await products_collection.delete_one({"_id": ObjectId(product_id)})
     except:

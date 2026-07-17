@@ -4,6 +4,7 @@ import Home from './pages/Home'
 import About from './pages/About'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
+import Register from './pages/Register'
 import Components from './pages/Components'
 
 
@@ -60,6 +61,7 @@ export default function App() {
           <Route path="/about" element={<About darkMode={darkMode} setDarkMode={setDarkMode} />} />
           <Route path="/dashboard" element={<Dashboard darkMode={darkMode} setDarkMode={setDarkMode} />} />
           <Route path="/login" element={<Login darkMode={darkMode} setDarkMode={setDarkMode} />} />
+          <Route path="/register" element={<Register darkMode={darkMode} setDarkMode={setDarkMode} />} />
           <Route path="/components" element={<Components darkMode={darkMode} setDarkMode={setDarkMode} />} />
         </Routes>
       </BrowserRouter>
