@@ -15,7 +15,8 @@ function Dashboard({ darkMode, setDarkMode }) {
     name: '', ingredients: '', weight: '', features: ''
   })
   const [editingId, setEditingId] = useState(null)
-  
+  const [generatedDescription, setGeneratedDescription] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
 
   useEffect(() => {
     fetch('http://127.0.0.1:8000/api/products')
@@ -32,18 +33,51 @@ function Dashboard({ darkMode, setDarkMode }) {
       })
   }, [])
 
- const handleGenerate = () => {
+  const handleGenerateDescription = () => {
+    setAiLoading(true)
+    setGeneratedDescription('')
+    const token = localStorage.getItem('token')
+
+    fetch('http://127.0.0.1:8000/api/ai/generate-description', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ ...form, tone: selectedTone })
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('AI generation failed')
+        return res.json()
+      })
+      .then(data => {
+        setGeneratedDescription(data.data.description)
+        setAiLoading(false)
+      })
+      .catch(() => {
+        setToastMessage('Failed to generate description. Please try again.')
+        setToastType('error')
+        setToastVisible(true)
+        setAiLoading(false)
+      })
+  }
+
+  const handleGenerate = () => {
     setLoading(true)
     const isEditing = editingId !== null
     const url = isEditing
       ? `http://127.0.0.1:8000/api/products/${editingId}`
       : 'http://127.0.0.1:8000/api/products'
     const method = isEditing ? 'PUT' : 'POST'
+    const token = localStorage.getItem('token')
 
     fetch(url, {
       method: method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, tone: selectedTone, description: '' })
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ ...form, tone: selectedTone, description: generatedDescription })
     })
       .then(res => res.json())
       .then(data => {
@@ -58,6 +92,7 @@ function Dashboard({ darkMode, setDarkMode }) {
         setToastVisible(true)
         setLoading(false)
         setForm({ name: '', ingredients: '', weight: '', features: '' })
+        setGeneratedDescription('')
         setEditingId(null)
       })
       .catch(() => {
@@ -76,12 +111,17 @@ function Dashboard({ darkMode, setDarkMode }) {
       features: product.features
     })
     setSelectedTone(product.tone)
+    setGeneratedDescription(product.description || '')
     setEditingId(product.id)
   }
 
   const handleDelete = (id) => {
     if (!window.confirm('Delete this product?')) return
-    fetch(`http://127.0.0.1:8000/api/products/${id}`, { method: 'DELETE' })
+    const token = localStorage.getItem('token')
+    fetch(`http://127.0.0.1:8000/api/products/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
       .then(() => {
         setProducts(prev => prev.filter(p => p.id !== id))
         setToastMessage('Product deleted successfully!')
@@ -174,6 +214,27 @@ function Dashboard({ darkMode, setDarkMode }) {
                     ))}
                   </div>
                 </div>
+
+                <button
+                  onClick={handleGenerateDescription}
+                  disabled={aiLoading}
+                  className="bg-blue-600 text-white w-full font-semibold py-3.5 rounded-xl text-base hover:bg-blue-700 transition disabled:opacity-50"
+                >
+                  {aiLoading ? 'Generating...' : '✨ Generate with AI'}
+                </button>
+
+                {aiLoading && (
+                  <div className="flex justify-center py-4">
+                    <Loader size="sm" text="AI is writing..." />
+                  </div>
+                )}
+
+                {generatedDescription && !aiLoading && (
+                  <div className={`p-4 rounded-xl border ${darkMode ? 'bg-gray-700 border-gray-600 text-gray-200' : 'bg-green-50 border-green-200 text-gray-800'}`}>
+                    <p className="text-xs font-semibold uppercase tracking-wide mb-2 text-green-600">Generated Description</p>
+                    <p className="text-sm">{generatedDescription}</p>
+                  </div>
+                )}
 
                 <button
                   onClick={handleGenerate}

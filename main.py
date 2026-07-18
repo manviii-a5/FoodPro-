@@ -14,9 +14,10 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import certifi
 import os
+from huggingface_hub import InferenceClient
 
 load_dotenv()
-
+hf_client = InferenceClient(token=os.getenv("HF_API_TOKEN"))
 app = FastAPI(title="FoodPro API", version="2.0.0")
 
 limiter = Limiter(key_func=get_remote_address)
@@ -80,7 +81,12 @@ def product_helper(product) -> dict:
         "tone": product["tone"],
         "description": product.get("description", ""),
     }
-
+class DescriptionRequest(BaseModel):
+    name: str
+    ingredients: str
+    weight: str
+    features: str
+    tone: str
 class Product(BaseModel):
     name: str
     ingredients: str
@@ -226,3 +232,32 @@ async def delete_product(product_id: str, current_user: dict = Depends(get_curre
 @app.get("/api/tones")
 async def get_tones():
     return {"status": "success", "data": ["Premium", "Traditional", "Health-Focused"]}
+
+# --- AI routes ---
+@app.post("/api/ai/generate-description")
+@limiter.limit("10/minute")
+async def generate_description(request: Request, data: DescriptionRequest, current_user: dict = Depends(get_current_user)):
+    prompt = f"""Write a compelling product description for a food product, in a {data.tone} tone.
+
+Product name: {data.name}
+Key ingredients: {data.ingredients}
+Weight/size: {data.weight}
+Key features: {data.features}
+
+Write 2-3 sentences. Do not include the product name as a heading, just the description text."""
+
+    try:
+        response = hf_client.chat.completions.create(
+        model="openai/gpt-oss-120b:cerebras",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=200
+        )
+        generated_text = response.choices[0].message.content.strip()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"AI service unavailable: {str(e)}")
+
+    return {"status": "success", "data": {"description": generated_text}}
+
+
+    
+    
