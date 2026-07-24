@@ -1,15 +1,31 @@
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+
 function Register({ darkMode, setDarkMode }) {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (localStorage.getItem('token')) {
+      navigate('/dashboard')
+    }
+  }, [navigate])
+
   const handleRegister = async () => {
     setError('')
+    if (!email.trim() || !password.trim()) {
+      setError('Please enter both email and password')
+      return
+    }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters')
+      return
+    }
     setLoading(true)
     try {
       const res = await fetch('http://127.0.0.1:8000/api/auth/register', {
@@ -31,6 +47,7 @@ function Register({ darkMode, setDarkMode }) {
       setLoading(false)
     }
   }
+
   return (
     <div>
       <Navbar darkMode={darkMode} setDarkMode={setDarkMode} />

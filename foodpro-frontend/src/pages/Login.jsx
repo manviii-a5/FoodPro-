@@ -1,6 +1,6 @@
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 
 function Login({ darkMode, setDarkMode }) {
@@ -10,8 +10,17 @@ function Login({ darkMode, setDarkMode }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  useEffect(()=> {
+    if(localStorage.getItem('token')){
+      navigate('/dashboard')
+    }
+  }, [navigate])
   const handleLogin = async () => {
     setError('')
+    if(!email.trim() || !password.trim()){
+      setError('Please enter both email and password')
+      return
+    }
     setLoading(true)
     try {
       const res = await fetch('http://127.0.0.1:8000/api/auth/login', {
