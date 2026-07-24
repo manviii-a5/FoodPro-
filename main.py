@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
@@ -104,8 +104,8 @@ class UpdateProduct(BaseModel):
     description: Optional[str] = None
 
 class UserRegister(BaseModel):
-    email: str
-    password: str
+    email: EmailStr
+    password: str = Field(min_length=8)
 
 class UserLogin(BaseModel):
     email: str
@@ -168,12 +168,6 @@ async def get_me(current_user: dict = Depends(get_current_user)):
     return {"status": "success", "data": current_user}
 
 # --- Product routes ---
-@app.get("/api/products")
-async def get_products():
-    products = []
-    async for product in products_collection.find():
-        products.append(product_helper(product))
-    return {"status": "success", "data": products, "count": len(products)}
 
 @app.get("/api/products/search/query")
 async def search_products(q: str):
@@ -187,19 +181,17 @@ async def search_products(q: str):
         products.append(product_helper(product))
     return {"status": "success", "data": products, "count": len(products)}
 
-@app.get("/api/products/{product_id}")
-async def get_product(product_id: str):
-    try:
-        product = await products_collection.find_one({"_id": ObjectId(product_id)})
-    except:
-        raise HTTPException(status_code=400, detail="Invalid product ID")
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    return {"status": "success", "data": product_helper(product)}
+@app.get("/api/products")
+async def get_products(current_user: dict = Depends(get_current_user)):
+    products = []
+    async for product in products_collection.find({"user_id": current_user["user_id"]}):
+        products.append(product_helper(product))
+    return {"status": "success", "data": products, "count": len(products)}
 
 @app.post("/api/products", status_code=201)
 async def create_product(product: Product, current_user: dict = Depends(get_current_user)):
     new_product = product.dict()
+    new_product["user_id"] = current_user["user_id"]
     result = await products_collection.insert_one(new_product)
     created = await products_collection.find_one({"_id": result.inserted_id})
     return {"status": "success", "data": product_helper(created)}
@@ -207,26 +199,29 @@ async def create_product(product: Product, current_user: dict = Depends(get_curr
 @app.put("/api/products/{product_id}")
 async def update_product(product_id: str, updated: UpdateProduct, current_user: dict = Depends(get_current_user)):
     try:
-        update_data = {k: v for k, v in updated.dict().items() if v is not None}
-        result = await products_collection.update_one(
-            {"_id": ObjectId(product_id)},
-            {"$set": update_data}
-        )
+        product = await products_collection.find_one({"_id": ObjectId(product_id)})
     except:
         raise HTTPException(status_code=400, detail="Invalid product ID")
-    if result.matched_count == 0:
+    if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    product = await products_collection.find_one({"_id": ObjectId(product_id)})
-    return {"status": "success", "data": product_helper(product)}
+    if product.get("user_id") != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="Not authorized to modify this product")
+    update_data = {k: v for k, v in updated.dict().items() if v is not None}
+    await products_collection.update_one({"_id": ObjectId(product_id)}, {"$set": update_data})
+    refreshed = await products_collection.find_one({"_id": ObjectId(product_id)})
+    return {"status": "success", "data": product_helper(refreshed)}
 
 @app.delete("/api/products/{product_id}", status_code=204)
 async def delete_product(product_id: str, current_user: dict = Depends(get_current_user)):
     try:
-        result = await products_collection.delete_one({"_id": ObjectId(product_id)})
+        product = await products_collection.find_one({"_id": ObjectId(product_id)})
     except:
         raise HTTPException(status_code=400, detail="Invalid product ID")
-    if result.deleted_count == 0:
+    if not product:
         raise HTTPException(status_code=404, detail="Product not found")
+    if product.get("user_id") != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this product")
+    await products_collection.delete_one({"_id": ObjectId(product_id)})
     return None
 
 @app.get("/api/tones")
@@ -258,6 +253,4 @@ Write 2-3 sentences. Do not include the product name as a heading, just the desc
 
     return {"status": "success", "data": {"description": generated_text}}
 
-
-    
-    
+   
