@@ -6,7 +6,8 @@ import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Components from './pages/Components'
-
+import ProtectedRoute from './components/ProtectedRoute'
+import ErrorBoundary from './components/ErrorBoundary'
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(false)
@@ -55,16 +56,25 @@ export default function App() {
   }
   return (
     <div className={darkMode ? 'dark bg-gray-950 min-h-screen' : 'bg-white min-h-screen'}>
-      <BrowserRouter>
+      <ErrorBoundary>
+        <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home darkMode={darkMode} setDarkMode={setDarkMode} />} />
           <Route path="/about" element={<About darkMode={darkMode} setDarkMode={setDarkMode} />} />
-          <Route path="/dashboard" element={<Dashboard darkMode={darkMode} setDarkMode={setDarkMode} />} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+               <Dashboard darkMode={darkMode} setDarkMode={setDarkMode} />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/login" element={<Login darkMode={darkMode} setDarkMode={setDarkMode} />} />
           <Route path="/register" element={<Register darkMode={darkMode} setDarkMode={setDarkMode} />} />
           <Route path="/components" element={<Components darkMode={darkMode} setDarkMode={setDarkMode} />} />
         </Routes>
-      </BrowserRouter>
+        </BrowserRouter>
+      </ErrorBoundary>
     </div>
   )
 }
