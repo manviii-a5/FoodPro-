@@ -1,10 +1,12 @@
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Loader from '../components/ui/Loader'
 import Toast from '../components/ui/Toast'
 
 function Dashboard({ darkMode, setDarkMode }) {
+  const navigate = useNavigate()
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [toastVisible, setToastVisible] = useState(false)
@@ -14,26 +16,51 @@ function Dashboard({ darkMode, setDarkMode }) {
   const [form, setForm] = useState({
     name: '', ingredients: '', weight: '', features: ''
   })
+  const [formErrors, setFormErrors] = useState({})
   const [editingId, setEditingId] = useState(null)
   const [generatedDescription, setGeneratedDescription] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/api/products')
-      .then(res => res.json())
+    const token = localStorage.getItem('token')
+    if (!token) {
+      navigate('/login')
+      return
+    }
+
+    fetch('http://127.0.0.1:8000/api/products', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(res => {
+        if (res.status === 401) {
+          localStorage.removeItem('token')
+          navigate('/login')
+          throw new Error('Unauthorized')
+        }
+        return res.json()
+      })
       .then(data => {
-        setProducts(data.data)
+        setProducts(data.data || [])
         setLoading(false)
       })
       .catch(() => {
-        setToastMessage('Failed to load products from backend')
-        setToastType('error')
-        setToastVisible(true)
         setLoading(false)
       })
-  }, [])
+  }, [navigate])
+
+  const validateForm = () => {
+    const errors = {}
+    if (!form.name.trim()) errors.name = 'Product name is required'
+    if (!form.ingredients.trim()) errors.ingredients = 'Ingredients are required'
+    if (!form.weight.trim()) errors.weight = 'Weight/size is required'
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
+  }
 
   const handleGenerateDescription = () => {
+    if (!validateForm()) return
     setAiLoading(true)
     setGeneratedDescription('')
     const token = localStorage.getItem('token')
@@ -46,16 +73,19 @@ function Dashboard({ darkMode, setDarkMode }) {
       },
       body: JSON.stringify({ ...form, tone: selectedTone })
     })
-      .then(res => {
-        if (!res.ok) throw new Error('AI generation failed')
-        return res.json()
+      .then(async res => {
+        const data = await res.json()
+        if (!res.ok) {
+          throw new Error(data.detail || 'AI generation failed')
+        }
+        return data
       })
       .then(data => {
         setGeneratedDescription(data.data.description)
         setAiLoading(false)
       })
-      .catch(() => {
-        setToastMessage('Failed to generate description. Please try again.')
+      .catch(err => {
+        setToastMessage(err.message || 'Failed to generate description. Please try again.')
         setToastType('error')
         setToastVisible(true)
         setAiLoading(false)
@@ -63,7 +93,8 @@ function Dashboard({ darkMode, setDarkMode }) {
   }
 
   const handleGenerate = () => {
-    setLoading(true)
+    if (!validateForm()) return
+    setSaving(true)
     const isEditing = editingId !== null
     const url = isEditing
       ? `http://127.0.0.1:8000/api/products/${editingId}`
@@ -90,8 +121,9 @@ function Dashboard({ darkMode, setDarkMode }) {
         }
         setToastType('success')
         setToastVisible(true)
-        setLoading(false)
+        setSaving(false)
         setForm({ name: '', ingredients: '', weight: '', features: '' })
+        setFormErrors({})
         setGeneratedDescription('')
         setEditingId(null)
       })
@@ -99,7 +131,7 @@ function Dashboard({ darkMode, setDarkMode }) {
         setToastMessage(isEditing ? 'Failed to update product' : 'Failed to create product')
         setToastType('error')
         setToastVisible(true)
-        setLoading(false)
+        setSaving(false)
       })
   }
 
@@ -110,6 +142,7 @@ function Dashboard({ darkMode, setDarkMode }) {
       weight: product.weight,
       features: product.features
     })
+    setFormErrors({})
     setSelectedTone(product.tone)
     setGeneratedDescription(product.description || '')
     setEditingId(product.id)
@@ -151,7 +184,6 @@ function Dashboard({ darkMode, setDarkMode }) {
           </div>
 
           <div className="grid md:grid-cols-2 gap-6">
-            {/* Input Panel */}
             <div className={`rounded-2xl border shadow-sm p-6 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
               <h2 className={`font-semibold mb-5 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Product Details</h2>
               <div className="space-y-4">
@@ -162,8 +194,9 @@ function Dashboard({ darkMode, setDarkMode }) {
                     placeholder="e.g. Himalayan Wildflower Honey"
                     value={form.name}
                     onChange={e => setForm({...form, name: e.target.value})}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                    className={`w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 ${formErrors.name ? 'border-red-400' : 'border-gray-200'}`}
                   />
+                  {formErrors.name && <p className="text-xs text-red-500 mt-1">{formErrors.name}</p>}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Key Ingredients</label>
@@ -172,8 +205,9 @@ function Dashboard({ darkMode, setDarkMode }) {
                     placeholder="e.g. Pure wild honey"
                     value={form.ingredients}
                     onChange={e => setForm({...form, ingredients: e.target.value})}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                    className={`w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 ${formErrors.ingredients ? 'border-red-400' : 'border-gray-200'}`}
                   />
+                  {formErrors.ingredients && <p className="text-xs text-red-500 mt-1">{formErrors.ingredients}</p>}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Weight / Size</label>
@@ -182,8 +216,9 @@ function Dashboard({ darkMode, setDarkMode }) {
                     placeholder="e.g. 500g"
                     value={form.weight}
                     onChange={e => setForm({...form, weight: e.target.value})}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                    className={`w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 ${formErrors.weight ? 'border-red-400' : 'border-gray-200'}`}
                   />
+                  {formErrors.weight && <p className="text-xs text-red-500 mt-1">{formErrors.weight}</p>}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Key Features</label>
@@ -230,22 +265,34 @@ function Dashboard({ darkMode, setDarkMode }) {
                 )}
 
                 {generatedDescription && !aiLoading && (
-                  <div className={`p-4 rounded-xl border ${darkMode ? 'bg-gray-700 border-gray-600 text-gray-200' : 'bg-green-50 border-green-200 text-gray-800'}`}>
-                    <p className="text-xs font-semibold uppercase tracking-wide mb-2 text-green-600">Generated Description</p>
+                  <div className={`p-4 rounded-xl border transition-opacity duration-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-gray-200' : 'bg-green-50 border-green-200 text-gray-800'}`}>
+                    <div className="flex justify-between items-center mb-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-green-600">Generated Description</p>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(generatedDescription)
+                          setCopied(true)
+                          setTimeout(() => setCopied(false), 2000)
+                        }}
+                        className="text-xs font-medium text-green-600 hover:text-green-700"
+                      >
+                        {copied ? '✓ Copied' : 'Copy'}
+                      </button>
+                    </div>
                     <p className="text-sm">{generatedDescription}</p>
                   </div>
                 )}
 
                 <button
                   onClick={handleGenerate}
-                  className="bg-green-600 text-white w-full font-semibold py-3.5 rounded-xl text-base hover:bg-green-700 transition mt-2"
+                  disabled={saving}
+                  className="bg-green-600 text-white w-full font-semibold py-3.5 rounded-xl text-base hover:bg-green-700 transition mt-2 disabled:opacity-50"
                 >
-                  {editingId ? 'Update Product' : 'Save Product'}
+                  {saving ? 'Saving...' : (editingId ? 'Update Product' : 'Save Product')}
                 </button>
               </div>
             </div>
 
-            {/* Products from Backend */}
             <div className={`rounded-2xl border shadow-sm p-6 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
               <h2 className={`font-semibold mb-5 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                 Products from Backend
@@ -253,6 +300,16 @@ function Dashboard({ darkMode, setDarkMode }) {
               {loading ? (
                 <div className="flex justify-center py-10">
                   <Loader size="md" text="Loading from API..." />
+                </div>
+              ) : products.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="text-4xl mb-3">📦</div>
+                  <p className={`font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    No products yet
+                  </p>
+                  <p className={`text-sm mt-1 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                    Fill out the form and generate your first description
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-3 max-h-96 overflow-y-auto">
