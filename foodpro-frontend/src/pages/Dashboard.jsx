@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom'
 import Loader from '../components/ui/Loader'
 import Toast from '../components/ui/Toast'
 
+const API_URL = import.meta.env.VITE_API_URL
+
 function Dashboard({ darkMode, setDarkMode }) {
   const navigate = useNavigate()
   const [products, setProducts] = useState([])
@@ -30,7 +32,7 @@ function Dashboard({ darkMode, setDarkMode }) {
       return
     }
 
-    fetch('http://127.0.0.1:8000/api/products', {
+    fetch(`${API_URL}/api/products`, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(res => {
@@ -65,7 +67,7 @@ function Dashboard({ darkMode, setDarkMode }) {
     setGeneratedDescription('')
     const token = localStorage.getItem('token')
 
-    fetch('http://127.0.0.1:8000/api/ai/generate-description', {
+    fetch(`${API_URL}/api/ai/generate-description`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -97,8 +99,8 @@ function Dashboard({ darkMode, setDarkMode }) {
     setSaving(true)
     const isEditing = editingId !== null
     const url = isEditing
-      ? `http://127.0.0.1:8000/api/products/${editingId}`
-      : 'http://127.0.0.1:8000/api/products'
+      ? `${API_URL}/api/products/${editingId}`
+      : `${API_URL}/api/products`
     const method = isEditing ? 'PUT' : 'POST'
     const token = localStorage.getItem('token')
 
@@ -151,7 +153,7 @@ function Dashboard({ darkMode, setDarkMode }) {
   const handleDelete = (id) => {
     if (!window.confirm('Delete this product?')) return
     const token = localStorage.getItem('token')
-    fetch(`http://127.0.0.1:8000/api/products/${id}`, {
+    fetch(`${API_URL}/api/products/${id}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` }
     })
