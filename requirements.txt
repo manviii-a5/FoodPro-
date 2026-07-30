@@ -10,3 +10,4 @@ slowapi
 httpx
 python-multipart
 huggingface_hub
+email-validator
