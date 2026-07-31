@@ -70,3 +70,20 @@ npm run dev
 ## Project Status
 
 Week 5 — Database integration complete (MongoDB Atlas + full CRUD via FastAPI/Motor).
+
+## Deployment
+
+- **Live Frontend:** https://food-pro-phi.vercel.app
+- **Live Backend:** https://foodpro-gd9i.onrender.com
+
+### Tech Stack
+- **Frontend:** React + Vite, Tailwind CSS
+- **Backend:** FastAPI (Python)
+- **Database:** MongoDB Atlas
+- **AI:** Hugging Face Inference API
+- **Auth:** JWT (via python-jose) + bcrypt password hashing
+- **Hosting:** Vercel (frontend), Render (backend)
+
+### Known Limitations
+- The backend is hosted on Render's free tier, which spins down after 15 minutes of inactivity. The first request after idle time may take 30–60 seconds to respond while the server wakes up.
+- Free-tier MongoDB Atlas cluster has limited storage and connection capacity, sufficient for demo/development use.
