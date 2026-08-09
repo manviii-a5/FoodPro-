@@ -1,18 +1,41 @@
-import { Link, useLocation } from 'react-router-dom'
-import { useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 
 function Navbar({ darkMode, setDarkMode }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('token'))
   const location = useLocation()
+  const navigate = useNavigate()
 
-  const navLinks = [
+  // Re-check login state whenever the route changes (e.g. right after login/register redirects)
+  useEffect(() => {
+    setIsLoggedIn(!!localStorage.getItem('token'))
+  }, [location.pathname])
+
+  const handleLogout = () => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('userEmail')
+    setIsLoggedIn(false)
+    setMenuOpen(false)
+    navigate('/login')
+  }
+
+  const baseLinks = [
     { name: 'Home', path: '/' },
     { name: 'About', path: '/about' },
     { name: 'Dashboard', path: '/dashboard' },
     { name: 'Components', path: '/components' },
-    { name: 'Login', path: '/login' },
-    { name: 'Register', path: '/register' },
   ]
+
+  // Show Login/Register only when logged out; Logout gets its own styled button below
+  const authLinks = isLoggedIn
+    ? []
+    : [
+        { name: 'Login', path: '/login' },
+        { name: 'Register', path: '/register' },
+      ]
+
+  const navLinks = [...baseLinks, ...authLinks]
 
   return (
     <nav className={`sticky top-0 z-50 border-b shadow-sm ${darkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-100'}`}>
@@ -42,6 +65,17 @@ function Navbar({ darkMode, setDarkMode }) {
             </Link>
           ))}
 
+          {isLoggedIn && (
+            <button
+              onClick={handleLogout}
+              className={`text-sm font-medium transition-colors ${
+                darkMode ? 'text-gray-300 hover:text-red-400' : 'text-gray-600 hover:text-red-600'
+              }`}
+            >
+              Logout
+            </button>
+          )}
+
           {/* Dark/Light toggle */}
           <button
             onClick={() => setDarkMode(!darkMode)}
@@ -52,12 +86,14 @@ function Navbar({ darkMode, setDarkMode }) {
             {darkMode ? 'Light' : 'Dark'}
           </button>
 
-          <Link
-            to="/dashboard"
-            className="bg-green-600 text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-green-700 transition"
-          >
-            Try Free
-          </Link>
+          {!isLoggedIn && (
+            <Link
+              to="/dashboard"
+              className="bg-green-600 text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-green-700 transition"
+            >
+              Try Free
+            </Link>
+          )}
         </div>
 
         <button
@@ -82,6 +118,16 @@ function Navbar({ darkMode, setDarkMode }) {
               {link.name}
             </Link>
           ))}
+
+          {isLoggedIn && (
+            <button
+              onClick={handleLogout}
+              className={`text-sm font-medium text-left ${darkMode ? 'text-red-400' : 'text-red-600'}`}
+            >
+              Logout
+            </button>
+          )}
+
           <button
             onClick={() => { setDarkMode(!darkMode); setMenuOpen(false) }}
             className={`px-3 py-2 rounded-lg text-sm font-semibold ${darkMode ? 'bg-yellow-400 text-gray-900' : 'bg-gray-800 text-white'}`}

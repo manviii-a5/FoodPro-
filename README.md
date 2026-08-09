@@ -9,13 +9,9 @@ AI-powered product description generator built for HimShakti, a food processing 
 
 ## Demo Video
 
-<!-- TODO: add YouTube Unlisted link once recorded -->
-🎥 [Watch the demo video](#)
+🎥 [Watch the demo video](https://youtu.be/AL-MUbQbeKs?si=7K6ebsgGxR487w9c)
 
 ## Screenshots
-
-<!-- TODO: embed 3-4 screenshots. Markdown syntax below — replace paths once you add
-     images to a /screenshots folder in the repo and commit them -->
 
 ![Homepage](./screenshots/homepage.png)
 ![AI Feature](./screenshots/ai-feature.png)
